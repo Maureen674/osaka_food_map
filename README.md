@@ -2,149 +2,168 @@ osaka food picked by maureen
 
 <html lang="zh">
 <head>
-  <meta charset="UTF-8" />
-  <title>大阪美食地图 🍜🍦🍣</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <title>大阪美食地图 🍣🍤🍰</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
     html, body {
       margin: 0;
-padding: 0;
+      padding: 0;
       height: 100%;
       width: 100%;
-      display: flex;
-      flex-direction: row;  /* 默认横向排列 */
       font-family: sans-serif;
-}
-
-    #map {
-      flex: 3;
-      height: 100%;
-}
-
-    #sidebar {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px;
-box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-      background: #fff;
-      min-width: 220px;
+      overflow: hidden;
     }
+
+    #map { height: 100%; width: 100%; }
+
+    /* 抽屉样式 */
+    #sidebar {
+      position: fixed;
+      top: 0;
+      right: -300px;
+      width: 300px;
+      height: 100%;
+      background: #fff;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.2);
+      padding: 12px;
+      overflow-y: auto;
+      transition: right 0.3s ease;
+      z-index: 1000;
+    }
+
+    #sidebar.open { right: 0; }
 
     .place {
       margin: 10px 0;
-padding: 10px;
+      padding: 10px;
       border-radius: 10px;
       background: #f9f9f9;
       cursor: pointer;
       display: flex;
       justify-content: space-between;
       align-items: center;
-}
+    }
     .place:hover { background: #ececec; }
-    .emoji { font-size: 20px; margin-right: 6px;
-}
+    .emoji { font-size: 20px; margin-right: 6px; }
 
-    h2 { margin-top: 0; }
-    #error { color: red; font-size: 14px; margin-top: 10px;
-}
-    a { text-decoration: none; color: #0077cc; }
-    button { margin-top: 12px;
-padding: 6px 10px; border: none; border-radius: 6px; background: #0077cc; color: white; cursor: pointer;
-}
+    button {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      background: #0077cc;
+      color: white;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
     button:hover { background: #005fa3; }
 
-    /* 📱 小屏幕优化：上下排列 (已修改) */
-    @media (max-width: 768px) {
-      /* 使用 column-reverse 将侧边栏显示在地图上方 */
-      html, body { flex-direction: column-reverse;
-}
-      /* 增加地图高度至 75% */
-      #map { height: 75vh; width: 100%;
-}
-      /* 减少侧边栏高度至 25%，并调整阴影方向 */
-      #sidebar { height: 25vh; width: 100%; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-    }
-
-    /* 地图 emoji 样式 */
-    .emoji-marker {
-      font-size: 24px;
-text-align: center;
-      line-height: 30px;
-    }
+    .emoji-marker { font-size: 24px; text-align: center; line-height: 30px; }
   </style>
 </head>
 <body>
+
   <div id="map"></div>
+
   <div id="sidebar">
-    <h2>🍴 我的大阪清单</h2>
+    <button onclick="toggleSidebar()">关闭 ×</button>
+    <h2>🍴 大阪美食清单</h2>
     <div id="places"></div>
-    <div id="error"></div>
     <button onclick="refreshLocation()">📍 刷新位置</button>
+    <div id="error" style="color:red;margin-top:10px;"></div>
   </div>
+
+  <button id="openBtn" onclick="toggleSidebar()" style="position: fixed; top: 20px; right: 20px; z-index:1001;">📋 菜单</button>
 
   <script>
     const destinations = [
       { name: "Sashisu", lat: 34.6984792, lng: 135.4997499, emoji: "🍣" },
       { name: "Kibitaki", lat: 34.6712265, lng: 135.5020764, emoji: "🍢" },
       { name: "Tempura Tarojiro", lat: 34.6678979, lng: 135.503683, emoji: "🍤" },
-      { name: "宫田面儿", lat: 
-34.6738237, lng: 135.5042491, emoji: "🍜" },
+      { name: "宫田面儿", lat: 34.6738237, lng: 135.5042491, emoji: "🍜" },
       { name: "Canelé du Japon", lat: 34.6766352, lng: 135.5065096, emoji: "🍰" }
     ];
-// 初始化地图
+
+    // 初始化地图
     let map = L.map("map").setView([34.6937, 135.5023], 14);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap"
     }).addTo(map);
 
     const placesDiv = document.getElementById("places");
-destinations.forEach(d => {
-      const gmapUrl = `https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}`;
+    let currentPosition = null; // 保存当前位置
 
-      // 侧边栏
-      const div = document.createElement("div");
-      div.className = "place";
-      div.innerHTML = `<span class="emoji">${d.emoji}</span><span>${d.name}</span><a href="${gmapUrl}" target="_blank">➡️</a>`;
-      div.onclick = () => map.setView([d.lat, d.lng], 16);
-      placesDiv.appendChild(div);
+    // Haversine公式计算两点距离（公里）
+    function calcDistance(lat1, lng1, lat2, lng2) {
+      const R = 6371; // 地球半径 km
+      const dLat = (lat2 - lat1) * Math.PI/180;
+      const dLng = (lng2 - lng1) * Math.PI/180;
+      const a = Math.sin(dLat/2)**2 +
+                Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
+                Math.sin(dLng/2)**2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
 
-      // 地图 emoji 标记
-      const emojiIcon = L.divIcon({
-        className: "emoji-marker",
-        html: 
-d.emoji,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
+    // 更新侧边栏
+    function updateSidebar() {
+      placesDiv.innerHTML = "";
+      const sorted = destinations.slice();
+      if(currentPosition) {
+        sorted.forEach(d => {
+          d.distance = calcDistance(currentPosition.lat, currentPosition.lng, d.lat, d.lng).toFixed(2);
+        });
+        sorted.sort((a,b) => a.distance - b.distance);
+      }
+      sorted.forEach(d => {
+        const gmapUrl = `https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}`;
+        const distText = d.distance ? ` (${d.distance} km)` : "";
+        const div = document.createElement("div");
+        div.className = "place";
+        div.innerHTML = `<span class="emoji">${d.emoji}</span><span>${d.name}${distText}</span><a href="${gmapUrl}" target="_blank">➡️</a>`;
+        div.onclick = () => map.setView([d.lat, d.lng], 16);
+        placesDiv.appendChild(div);
       });
+    }
 
-      L.marker([d.lat, d.lng], { icon: emojiIcon })
+    // 初始化地图标记
+    destinations.forEach(d => {
+      const gmapUrl = `https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}`;
+      const emojiIcon = L.divIcon({ className:"emoji-marker", html:d.emoji, iconSize:[30,30], iconAnchor:[15,15] });
+      L.marker([d.lat,d.lng], {icon: emojiIcon})
         .addTo(map)
         .bindPopup(`${d.emoji} <b>${d.name}</b><br><a href="${gmapUrl}" target="_blank">在Google Maps导航</a>`);
     });
-// 定位功能
+
+    // 定位功能
     function refreshLocation() {
-      if (!navigator.geolocation) {
-        showError("❌ 浏览器不支持定位");
-return;
-      }
+      if(!navigator.geolocation) { showError("❌ 浏览器不支持定位"); return; }
       navigator.geolocation.getCurrentPosition(
         pos => {
           const { latitude, longitude } = pos.coords;
+          currentPosition = { lat: latitude, lng: longitude };
           L.marker([latitude, longitude]).addTo(map).bindPopup("📍 你在这里").openPopup();
           map.setView([latitude, longitude], 15);
+          updateSidebar();
         },
         err => showError("⚠️ 定位失败：" + err.message)
       );
-}
-
-    function showError(msg) {
-      document.getElementById("error").textContent = msg;
     }
+
+    // 侧边栏控制
+    const sidebar = document.getElementById("sidebar");
+    function toggleSidebar() { sidebar.classList.toggle("open"); }
+
+    function showError(msg) { document.getElementById("error").textContent = msg; }
+
+    // 页面加载时先显示不带距离的列表
+    updateSidebar();
   </script>
+
 </body>
 </html>
