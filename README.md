@@ -1,6 +1,4 @@
-# osaka_food_map
 osaka food picked by maureen
-<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
