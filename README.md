@@ -89,18 +89,16 @@ osaka food picked by maureen
       { name: "Canelé du Japon", lat: 34.6766352, lng: 135.5065096, emoji: "🍰" }
     ];
 
-    // 初始化地图
     let map = L.map("map").setView([34.6937, 135.5023], 14);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap"
     }).addTo(map);
 
     const placesDiv = document.getElementById("places");
-    let currentPosition = null; // 保存当前位置
+    let currentPosition = null; 
 
-    // Haversine公式计算两点距离（公里）
     function calcDistance(lat1, lng1, lat2, lng2) {
-      const R = 6371; // 地球半径 km
+      const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI/180;
       const dLng = (lng2 - lng1) * Math.PI/180;
       const a = Math.sin(dLat/2)**2 +
@@ -110,7 +108,6 @@ osaka food picked by maureen
       return R * c;
     }
 
-    // 更新侧边栏
     function updateSidebar() {
       placesDiv.innerHTML = "";
       const sorted = destinations.slice();
@@ -131,7 +128,6 @@ osaka food picked by maureen
       });
     }
 
-    // 初始化地图标记
     destinations.forEach(d => {
       const gmapUrl = `https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}`;
       const emojiIcon = L.divIcon({ className:"emoji-marker", html:d.emoji, iconSize:[30,30], iconAnchor:[15,15] });
@@ -140,7 +136,6 @@ osaka food picked by maureen
         .bindPopup(`${d.emoji} <b>${d.name}</b><br><a href="${gmapUrl}" target="_blank">在Google Maps导航</a>`);
     });
 
-    // 定位功能
     function refreshLocation() {
       if(!navigator.geolocation) { showError("❌ 浏览器不支持定位"); return; }
       navigator.geolocation.getCurrentPosition(
@@ -150,18 +145,22 @@ osaka food picked by maureen
           L.marker([latitude, longitude]).addTo(map).bindPopup("📍 你在这里").openPopup();
           map.setView([latitude, longitude], 15);
           updateSidebar();
+          map.invalidateSize(); // 修复地图显示
         },
         err => showError("⚠️ 定位失败：" + err.message)
       );
     }
 
-    // 侧边栏控制
     const sidebar = document.getElementById("sidebar");
-    function toggleSidebar() { sidebar.classList.toggle("open"); }
+    function toggleSidebar() {
+      sidebar.classList.toggle("open");
+      setTimeout(() => { map.invalidateSize(); }, 300); // 抽屉动画结束后刷新地图
+    }
 
     function showError(msg) { document.getElementById("error").textContent = msg; }
 
-    // 页面加载时先显示不带距离的列表
+    window.onload = () => { setTimeout(()=>{ map.invalidateSize(); }, 100); };
+
     updateSidebar();
   </script>
 
